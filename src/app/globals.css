@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-electric-blue: #007BFF;
+  --color-soft-sky-blue: #E3F2FD;
+  --color-crisp-white: #FFFFFF;
+  --color-dark-bg: #0B1120;
+  --color-dark-card: #1E293B;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: var(--color-crisp-white);
+  --foreground: #171717;
+}
+
+.dark {
+  --background: var(--color-dark-bg);
+  --foreground: var(--color-crisp-white);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.skeleton {
+  @apply animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md;
+}
+
+/* 3D Transform Utilities for Flashcards */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+}
