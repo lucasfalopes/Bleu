@@ -2,41 +2,97 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Flashcard, { VocabWord } from "@/components/Flashcard";
-import { BookMarked, Search, Trophy } from "lucide-react";
+import Flashcard from "@/components/Flashcard";
+import { BookMarked, Search, Trophy, Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
-const mockVocab: VocabWord[] = [
-  { id: "1", word: "Croissant", translation: "Crescent-shaped pastry", context: "Je voudrais un croissant, s'il vous plaît.", masteryLevel: 1 },
-  { id: "2", word: "Toujours", translation: "Always", context: "Il est toujours en retard.", masteryLevel: 2 },
-  { id: "3", word: "Génial", translation: "Awesome / Great", context: "C'est une idée géniale !", masteryLevel: 0 },
-  { id: "4", word: "Pourtant", translation: "However / Yet", context: "Il pleut, et pourtant il fait chaud.", masteryLevel: 3 },
-];
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function Carnet() {
+  const { status } = useSession();
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState<"bank" | "review">("bank");
   const [search, setSearch] = useState("");
-  const [reviewQueue, setReviewQueue] = useState<VocabWord[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [vocabBank, setVocabBank] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [reviewQueue, setReviewQueue] = useState<any[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Only randomize queue after component mount (client side)
-    setReviewQueue([...mockVocab].sort(() => Math.random() - 0.5));
-  }, []);
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
+    }
+  }, [status, router]);
 
-  const handleNextCard = () => {
+  useEffect(() => {
+    const fetchVocab = async () => {
+      try {
+        const res = await fetch("/api/vocab");
+        if (res.ok) {
+          const data = await res.json();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const mappedVocab = data.vocabs.map((v: any) => ({
+            id: v.id,
+            word: v.wordOriginal,
+            translation: v.translation,
+            context: v.contextSentence,
+            masteryLevel: v.masteryLevel,
+            nextReviewDate: v.nextReviewDate,
+          }));
+
+          setVocabBank(mappedVocab);
+
+          const now = new Date();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const dueForReview = mappedVocab.filter((v: any) => new Date(v.nextReviewDate) <= now);
+          setReviewQueue(dueForReview.sort(() => Math.random() - 0.5));
+        }
+      } catch (error) {
+        console.error("Failed to fetch vocab:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (status === "authenticated") {
+      fetchVocab();
+    }
+  }, [status]);
+
+  const handleNextCard = async (delta: number) => {
+    const currentCard = reviewQueue[currentCardIndex];
+
+    try {
+      await fetch(`/api/vocab/${currentCard.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ masteryDelta: delta }),
+      });
+      // In a real app, update vocabBank state here too for consistency
+    } catch (error) {
+      console.error("Failed to update mastery:", error);
+    }
+
     setTimeout(() => {
       if (currentCardIndex < reviewQueue.length - 1) {
         setCurrentCardIndex(prev => prev + 1);
       } else {
-        setReviewQueue([]); // Finished
+        setReviewQueue([]);
       }
-    }, 300); // Wait for flip animation
+    }, 300);
   };
 
-  const filteredVocab = mockVocab.filter(v =>
+  const filteredVocab = vocabBank.filter(v =>
     v.word.toLowerCase().includes(search.toLowerCase()) ||
     v.translation.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (status === "loading" || isLoading) {
+    return <div className="flex justify-center items-center min-h-[50vh]"><Loader2 className="animate-spin text-electric-blue" size={32} /></div>;
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -101,6 +157,11 @@ export default function Carnet() {
                   </div>
                 </div>
               ))}
+              {filteredVocab.length === 0 && (
+                <div className="col-span-full text-center py-12 text-gray-500">
+                  No vocabulary words found. Start a conversation in Le Salon to flag words!
+                </div>
+              )}
             </div>
           </motion.div>
         ) : (

@@ -32,7 +32,7 @@ export default function Navigation() {
             Sign Out
           </button>
         ) : (
-          <Link href="/api/auth/signin" className="text-sm font-medium hover:text-electric-blue transition-colors">
+          <Link href="/auth/signin" className="text-sm font-medium hover:text-electric-blue transition-colors">
             Sign In
           </Link>
         )}

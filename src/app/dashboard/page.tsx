@@ -1,9 +1,46 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Award, Flame, Star, Trophy } from "lucide-react";
+import { Award, Flame, Star, Trophy, Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function Dashboard() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [userData, setUserData] = useState<any>(null);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
+    }
+  }, [status, router]);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const res = await fetch("/api/user");
+        if (res.ok) {
+          const data = await res.json();
+          setUserData(data.user);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user data", error);
+      }
+    };
+
+    if (status === "authenticated") {
+      fetchUserData();
+    }
+  }, [status]);
+
+  if (status === "loading" || (status === "authenticated" && !userData)) {
+    return <div className="flex justify-center items-center min-h-[50vh]"><Loader2 className="animate-spin text-electric-blue" size={32} /></div>;
+  }
+
   const container = {
     hidden: { opacity: 0 },
     show: {
@@ -33,7 +70,7 @@ export default function Dashboard() {
           </div>
           <div>
             <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Daily Streak</p>
-            <p className="text-2xl font-bold">14 Days</p>
+            <p className="text-2xl font-bold">{userData?.streakCount || 0} Days</p>
           </div>
         </motion.div>
 
@@ -43,7 +80,7 @@ export default function Dashboard() {
           </div>
           <div>
             <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total XP</p>
-            <p className="text-2xl font-bold">4,250</p>
+            <p className="text-2xl font-bold">{userData?.xpTotal || 0}</p>
           </div>
         </motion.div>
 
@@ -53,7 +90,7 @@ export default function Dashboard() {
           </div>
           <div>
             <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Level</p>
-            <p className="text-2xl font-bold">Intermediate 2</p>
+            <p className="text-2xl font-bold">{userData?.level || 1}</p>
           </div>
         </motion.div>
       </div>
@@ -64,14 +101,21 @@ export default function Dashboard() {
           Awards Vault
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {["7-Day Fire", "Vocab Master", "First Lesson", "Perfect Score"].map((badge, i) => (
-            <div key={i} className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-              <div className="w-16 h-16 bg-soft-sky-blue dark:bg-blue-900/40 rounded-full flex items-center justify-center mb-2">
-                <Award size={28} className="text-electric-blue" />
+          {userData?.awards?.length > 0 ? (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            userData.awards.map((award: any, i: number) => (
+              <div key={i} className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                <div className="w-16 h-16 bg-soft-sky-blue dark:bg-blue-900/40 rounded-full flex items-center justify-center mb-2">
+                  <Award size={28} className="text-electric-blue" />
+                </div>
+                <span className="text-sm font-medium text-center">{award.badgeName}</span>
               </div>
-              <span className="text-sm font-medium text-center">{badge}</span>
+            ))
+          ) : (
+            <div className="col-span-full py-8 text-center text-gray-500">
+              No awards yet. Keep learning to earn badges!
             </div>
-          ))}
+          )}
         </div>
       </motion.div>
     </motion.div>

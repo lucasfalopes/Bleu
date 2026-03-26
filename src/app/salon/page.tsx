@@ -3,11 +3,16 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Mic, Volume2, Flag, X, Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 type Message = { id: string; role: "user" | "assistant"; content: string };
 type TooltipData = { word: string; x: number; y: number } | null;
 
 export default function Salon() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
   const [theme, setTheme] = useState("");
   const [isStarted, setIsStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -16,12 +21,17 @@ export default function Salon() {
   const [tooltip, setTooltip] = useState<TooltipData>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
+    }
+  }, [status, router]);
+
   const startSession = async () => {
     if (!theme.trim()) return;
     setIsStarted(true);
     setIsLoading(true);
 
-    // Initial fetch to start conversation based on theme
     try {
       const res = await fetch("/api/salon", {
         method: "POST",
@@ -75,6 +85,33 @@ export default function Salon() {
     });
   };
 
+  const flagWord = async () => {
+    if (!tooltip) return;
+    try {
+      // Create a mock translation since we don't have a real translation API yet
+      const translation = `Translation for ${tooltip.word}`;
+
+      const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
+
+      const res = await fetch("/api/vocab", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wordOriginal: tooltip.word,
+          translation,
+          contextSentence: lastAssistantMessage?.content || "",
+        }),
+      });
+
+      if (res.ok) {
+        setTooltip(null);
+        alert(`Saved "${tooltip.word}" to Carnet!`);
+      }
+    } catch (error) {
+      console.error("Failed to flag word:", error);
+    }
+  };
+
   const speakText = (text: string) => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
@@ -83,12 +120,15 @@ export default function Salon() {
     }
   };
 
-  // Click outside to close tooltip
   useEffect(() => {
     const closeTooltip = () => setTooltip(null);
     window.addEventListener("click", closeTooltip);
     return () => window.removeEventListener("click", closeTooltip);
   }, []);
+
+  if (status === "loading") {
+    return <div className="flex justify-center items-center min-h-[50vh]"><Loader2 className="animate-spin text-electric-blue" size={32} /></div>;
+  }
 
   if (!isStarted) {
     return (
@@ -192,7 +232,10 @@ export default function Salon() {
           >
             <div className="font-bold mb-1 text-lg">{tooltip.word}</div>
             <div className="text-sm text-gray-500 mb-3 italic">Loading definition...</div>
-            <button className="w-full py-1.5 bg-soft-sky-blue text-electric-blue dark:bg-blue-900/30 dark:text-blue-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors">
+            <button
+              onClick={flagWord}
+              className="w-full py-1.5 bg-soft-sky-blue text-electric-blue dark:bg-blue-900/30 dark:text-blue-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+            >
               <Flag size={14} /> Flag Word
             </button>
             <div className="absolute left-1/2 -bottom-2 -translate-x-1/2 w-4 h-4 bg-white dark:bg-gray-800 rotate-45 border-r border-b border-gray-100 dark:border-gray-700" />

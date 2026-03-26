@@ -1,9 +1,49 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Search, UserPlus, Flame, Star } from "lucide-react";
+import { Search, UserPlus, Flame, Star, Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function Friends() {
+  const { status } = useSession();
+  const router = useRouter();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
+    }
+  }, [status, router]);
+
+  useEffect(() => {
+    const fetchFriends = async () => {
+      try {
+        const res = await fetch("/api/friends/leaderboard");
+        if (res.ok) {
+          const data = await res.json();
+          setLeaderboard(data.leaderboard);
+        }
+      } catch (error) {
+        console.error("Failed to fetch friends", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (status === "authenticated") {
+      fetchFriends();
+    }
+  }, [status]);
+
+  if (status === "loading" || isLoading) {
+    return <div className="flex justify-center items-center min-h-[50vh]"><Loader2 className="animate-spin text-electric-blue" size={32} /></div>;
+  }
+
   const container = {
     hidden: { opacity: 0 },
     show: {
@@ -42,38 +82,39 @@ export default function Friends() {
         </div>
 
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
-          {[
-            { rank: 1, name: "Sophie Martin", xp: 1250, streak: 45, me: false },
-            { rank: 2, name: "Lucas Dubois", xp: 1120, streak: 21, me: false },
-            { rank: 3, name: "You", xp: 850, streak: 14, me: true },
-            { rank: 4, name: "Emma Bernard", xp: 640, streak: 7, me: false },
-          ].map((user) => (
-            <motion.div
-              variants={item}
-              key={user.rank}
-              className={`p-4 sm:p-6 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${user.me ? 'bg-soft-sky-blue/30 dark:bg-blue-900/10' : ''}`}
-            >
-              <div className="w-8 font-bold text-gray-400 text-lg">#{user.rank}</div>
-              <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full flex-shrink-0" />
-              <div className="flex-1">
-                <div className="font-semibold text-lg flex items-center gap-2">
-                  {user.name}
-                  {user.me && <span className="text-xs bg-electric-blue text-white px-2 py-0.5 rounded-full">Me</span>}
+          {leaderboard.length > 0 ? (
+            leaderboard.map((user, index) => (
+              <motion.div
+                variants={item}
+                key={user.id}
+                className={`p-4 sm:p-6 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${user.me ? 'bg-soft-sky-blue/30 dark:bg-blue-900/10' : ''}`}
+              >
+                <div className="w-8 font-bold text-gray-400 text-lg">#{index + 1}</div>
+                <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="font-semibold text-lg flex items-center gap-2">
+                    {user.name}
+                    {user.me && <span className="text-xs bg-electric-blue text-white px-2 py-0.5 rounded-full">Me</span>}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-1.5 hidden sm:flex">
-                  <Flame className="text-orange-500" size={18} />
-                  <span className="font-medium text-gray-600 dark:text-gray-300">{user.streak}</span>
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-1.5 hidden sm:flex">
+                    <Flame className="text-orange-500" size={18} />
+                    <span className="font-medium text-gray-600 dark:text-gray-300">{user.streakCount}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Star className="text-electric-blue" size={18} />
+                    <span className="font-bold">{user.xpTotal} XP</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Star className="text-electric-blue" size={18} />
-                  <span className="font-bold">{user.xp} XP</span>
-                </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))
+          ) : (
+            <div className="p-8 text-center text-gray-500">
+              No friends found. Add friends to see them on the leaderboard!
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
