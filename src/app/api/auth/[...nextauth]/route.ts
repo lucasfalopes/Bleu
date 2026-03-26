@@ -3,6 +3,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -25,8 +26,11 @@ const handler = NextAuth({
             where: { email: credentials.email }
           });
 
-          if (user) {
-            return user;
+          if (user && user.password) {
+            const isValid = await bcrypt.compare(credentials.password, user.password);
+            if (isValid) {
+              return user;
+            }
           }
         }
         return null;
@@ -36,7 +40,19 @@ const handler = NextAuth({
   session: {
     strategy: "jwt"
   },
+  callbacks: {
+    async session({ session, token }) {
+      if (session?.user && token?.sub) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (session.user as any).id = token.sub;
+      }
+      return session;
+    }
+  },
   secret: process.env.NEXTAUTH_SECRET || "fallback_secret",
+  pages: {
+    signIn: '/auth/signin',
+  }
 });
 
 export { handler as GET, handler as POST };
